@@ -22,11 +22,11 @@ The vignette (`vignette("rotationGWAS")`) goes through these steps in the order 
 
 ## Installation
 
-The package will be available from its GitHub repository and archived with a DOI on its release. Until then, install from the sources:
+Install from GitHub:
 
 ```r
 # install.packages("remotes")
-remotes::install_local("rotationGWAS", build_vignettes = TRUE)
+remotes::install_github("yawarhabib/rotationGWAS", build_vignettes = TRUE)
 ```
 
 The package imports only `stats`. The vignette's first stage uses lme4, emmeans and pbkrtest.

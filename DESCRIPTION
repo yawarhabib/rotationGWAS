@@ -19,6 +19,8 @@ Description: Second-stage genome-wide association analysis of adjusted means fro
     analysis of the field trial; the vignette shows that first stage on the
     synthetic rolling-panel trials shipped with the package.
 License: GPL (>= 3)
+URL: https://github.com/yawarhabib/rotationGWAS
+BugReports: https://github.com/yawarhabib/rotationGWAS/issues
 Encoding: UTF-8
 Depends: R (>= 4.1)
 Imports: stats, utils

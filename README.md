@@ -20,6 +20,8 @@ The package starts after the first stage. It takes the adjusted means, their var
 
 The vignette (`vignette("rotationGWAS")`) goes through these steps in the order of the paper's Conclusions on three synthetic rolling-panel trials shipped with the package, starting with the first stage in lme4 and emmeans.
 
+Website: https://yawarhabib.github.io/rotationGWAS/
+
 ## Installation
 
 Install from GitHub:

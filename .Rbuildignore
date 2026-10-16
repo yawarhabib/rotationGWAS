@@ -8,3 +8,6 @@
 ^private$
 ^\.github$
 ^\.zenodo\.json$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$

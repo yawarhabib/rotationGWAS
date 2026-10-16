@@ -1,0 +1,10 @@
+^\.git$
+^\.gitignore$
+^\.Rproj\.user$
+^.*\.Rproj$
+^LICENSE\.md$
+^README\.Rmd$
+^data-raw$
+^private$
+^\.github$
+^\.zenodo\.json$

@@ -1,0 +1,257 @@
+---
+title: "Rotated two-stage GWAS with rotationGWAS"
+author: "Yawar Habib and Hans-Peter Piepho"
+output:
+  rmarkdown::html_vignette:
+    toc: true
+    number_sections: false
+vignette: >
+  %\VignetteIndexEntry{Rotated two-stage GWAS with rotationGWAS}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.dim = c(7, 4))
+options(width = 100, digits = 4)
+library(rotationGWAS)
+```
+
+## The rotationGWAS package {-}
+
+A genome-wide association study (GWAS) in plant breeding is often conducted in two stages. The first stage analyses the field trial and yields one adjusted mean per accession. The second stage uses these means as the response of a marker-based association model with a relationship matrix. In an unbalanced trial the adjusted means are estimated with unequal precision and are correlated, but most GWAS packages treat them as independent observations of equal precision, because they take no variance-covariance matrix of the means. rotationGWAS carries that matrix into the second stage by the rotation of Piepho et al. (2012), and shows beforehand, for every marker, what the usual approximations would cost.
+
+### Theoretical background
+
+Let $\bar{y}$ be the vector of adjusted means of $n$ accessions from the first stage and $\Omega$ their variance-covariance matrix. The second-stage model for one marker is
+
+$$\bar{y} = \mathbf{1}\mu + Q\gamma + z\beta + g + \epsilon, \qquad g \sim N(0, \sigma_g^2 A), \qquad \epsilon \sim N(0, \Omega),$$
+
+with $Q$ the covariates (for example principal components), $z$ the marker dosages with effect $\beta$, $g$ the accession genetic effect with the relationship matrix $A$, and $\epsilon$ the estimation error of the means, whose covariance $\Omega$ is known from the first stage. Routine two-stage analyses replace $\Omega$ by $\sigma^2 I$ (the unweighted analysis) or by its diagonal (inverse-variance weighting).
+
+The rotation is the symmetric matrix $W = \Omega^{-1/2}$. Pre-multiplying the means and every term of the model by it gives
+
+$$W\bar{y} = W\mathbf{1}\mu + WQ\gamma + Wz\beta + Wg + W\epsilon, \qquad \mathrm{Var}(Wg) = \sigma_g^2 \, WAW, \qquad \mathrm{Var}(W\epsilon) = I,$$
+
+so the estimation errors of the rotated means are independent with unit variance and the rotated model is an ordinary mixed-model GWAS with the kernel $WAW$ and a residual variance whose target value is one. With known variance components the rotated two-stage analysis reproduces the single-stage analysis of the plot data. The rotated intercept $W\mathbf{1}$ is a column with varying entries, which is why the rotated inputs cannot be passed to software that builds its own intercept.
+
+### Application in the package
+
+The package starts after the first stage and follows the steps of Habib and Piepho (2026):
+
+1. `rotation()` aligns the inputs by accession name, builds $W$, rotates the means, the intercept, the covariates and the relationship matrix, and fits the model without a marker with the residual variance estimated and fixed at one.
+2. `efficiency()` and `estimation_share()` give, before any scan, the standard error of every marker's effect under inverse-variance weighting and under the unweighted analysis relative to the rotation, and the share of the variance of the means that is estimation error.
+3. `genome_scan()` tests every marker with the variance components held at the model without a marker, under the rotation and, for comparison, under the two approximate schemes.
+4. `specification_test()` tests the residual variance of the rotated model against one.
+5. `independent_effect()` extends the model by an effect independent across accessions when that test rejects; the scan can then run under the extended model.
+6. `refit_markers()` refits markers close to the significance threshold with the marker in the model and the residual variance fixed at one.
+
+Every object has a `print` method, the efficiency and the scan have a `summary`, and the rotation, the efficiency, the scan and the specification test have a `plot`.
+
+## The inputs
+
+All inputs are matched by accession name, so each must carry the names.
+
+- **`means`**: a named numeric vector of the adjusted means, best linear unbiased estimates with the accessions fixed in the first stage.
+- **`Omega`**: their variance-covariance matrix from the first stage, with the names as dimnames. The matrix itself, not its inverse and not a correlation matrix. A diagonal matrix built from standard errors alone is accepted; `rotation()` then says that the analysis is inverse-variance weighting, and the functions that need the full matrix refuse it.
+- **`relationship`**: the relationship matrix among the accessions on its original scale; it may be singular.
+- **`covariates`**: an optional numeric matrix with the names as row names, for example principal components. The intercept is added by the package.
+- **`markers`**: a numeric matrix of dosages (0, 1, 2), accessions in rows and markers in columns, complete; missing calls are imputed before the analysis.
+- A **map** with the columns `marker`, `chromosome` and `position` is used only by the plots along the genome.
+
+## Worked example
+
+### The data
+
+The package ships a simulated population and three simulated trials of it (`?panels`). The population has 150 inbred lines in 15 families from 24 founders in three subpopulations, with 1,998 markers on ten chromosomes. The trials are rolling panels: each line is grown in consecutive environments with three replicates, its window rolling evenly over the environments.
+
+```{r data}
+G <- panel_genotypes$markers          # dosages, 150 lines x 1,998 markers
+A <- panel_genotypes$relationship     # VanRaden's matrix, scaled to a mean diagonal of one
+Q <- panel_genotypes$covariates       # the first three principal components
+map <- panel_genotypes$map
+panels <- list(dense = panel_dense, sparse = panel_sparse, misspecified = panel_misspecified)
+knitr::kable(data.frame(
+  panel = names(panels),
+  environments = sapply(panels, function(p) p$design$environments),
+  per_line = sapply(panels, function(p) paste(range(p$design$environments_per_accession), collapse = " to ")),
+  plots = sapply(panels, function(p) p$design$plots),
+  lines_per_environment = sapply(panels, function(p) round(p$design$accessions_per_environment, 1)),
+  independent_effect = sapply(panels, function(p) p$truth$independent_variance),
+  row.names = NULL), caption = "The three trials. The genetic variance carried by the relationship matrix is 10 in each.")
+```
+
+The dense and the sparse panel have the same lines, replication and number of plots and differ only in how many lines share an environment. The misspecified panel is the dense design with unequal replication and a genetic effect independent across lines added to the data, which the relationship matrix does not represent.
+
+### The first stage
+
+The first stage is a mixed model for the plot data whose terms depend on the design of the trial. For the shipped panels it is the paper's model: line and environment as fixed effects, replicate within environment and line-by-environment as random effects. The adjusted means are the estimated marginal means of the lines and their variance-covariance matrix is the Kenward-Roger adjusted one, both from emmeans. This chunk repeats the first stage of the dense panel and checks it against the shipped values; any first-stage software that yields the means and their full variance-covariance matrix can take its place.
+
+```{r first-stage, eval = requireNamespace("lme4", quietly = TRUE) && requireNamespace("emmeans", quietly = TRUE) && requireNamespace("pbkrtest", quietly = TRUE)}
+plots <- panel_dense$plots
+head(plots, 3)
+## The first-stage model, fitted by REML.
+m1 <- lme4::lmer(y ~ accession + environment + (1 | environment:replicate) + (1 | accession:environment),
+                 data = plots, REML = TRUE)
+## The adjusted means and their variance-covariance matrix.
+emm <- emmeans::emmeans(m1, ~ accession, mode = "kenward-roger")
+s1 <- summary(emm)
+means <- setNames(s1$emmean, as.character(s1$accession))
+Omega <- as.matrix(vcov(emm))
+dimnames(Omega) <- list(names(means), names(means))
+all.equal(means, panel_dense$means)
+all.equal(Omega, panel_dense$Omega)
+```
+
+### The rotation
+
+```{r rotation}
+## The rotation of the dense and of the sparse panel.
+rd <- rotation(panel_dense$means, panel_dense$Omega, A, Q)
+rs <- rotation(panel_sparse$means, panel_sparse$Omega, A, Q)
+rd
+rs
+```
+
+The print summarises $\Omega$ and gives the model without a marker. The plot shows the structure of $\Omega$: in the dense panel the means are nearly uncorrelated, in the sparse panel the lines that share environments are strongly correlated, because the environment effects are estimated from few lines.
+
+```{r omega-plot, fig.dim = c(7.5, 3.9)}
+## The absolute correlations of the adjusted means, in the order of the lines.
+op <- par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+plot(rd, main = "dense panel")
+plot(rs, main = "sparse panel")
+par(op)
+```
+
+### The loss of precision before the scan
+
+The standard error of a marker effect under inverse-variance weighting and under the unweighted analysis, relative to the rotation, follows from $\Omega$, the genetic variance and the genotypes without a scan. The genetic variance is taken from the rotated model without a marker with the residual variance fixed at one.
+
+```{r efficiency}
+## The factor on the standard error of every marker, for both panels.
+ed <- efficiency(rd, G)
+es <- efficiency(rs, G)
+summary(ed)
+summary(es)
+```
+
+In the dense panel the factors are one: the three schemes are equivalent and nothing is lost by the approximate weightings. In the sparse panel the standard error under the approximate weightings is larger than under the rotation by a median of about twelve per cent, and at single markers by more than seventy per cent; on the variance scale the median loss of precision is about twenty per cent. The plot shows the factors against the allele frequency; `type = "genome"` with the map shows them along the genome.
+
+```{r efficiency-plot}
+plot(es)
+```
+
+```{r efficiency-top}
+## The five markers that lose most under the unweighted analysis.
+knitr::kable(head(es[order(-es$unweighted), ], 5), digits = 3, row.names = FALSE)
+estimation_share(rs)
+```
+
+### The genome scan
+
+`genome_scan()` tests every marker with the ratio of the residual to the genetic variance held at the model without a marker and the residual scale re-estimated at each marker (the P3D approximation), by a t test on $n - p - 1$ degrees of freedom with a Bonferroni threshold over the markers tested. Each scheme fits its own model without a marker.
+
+```{r scan}
+## The scan of the sparse panel under the three schemes.
+ss <- genome_scan(rs, G, scheme = c("rotated", "inverse_variance", "unweighted"))
+summary(ss)
+```
+
+The QQ plot sets the observed $-\log_{10} p$ against those expected under no association, with the genomic inflation factor of each scheme; the Manhattan plot shows one scheme along the genome, with the threshold, the significant markers in red and chosen markers circled, here the three causal markers of the simulation.
+
+```{r qq-plot}
+plot(ss, type = "qq")
+```
+
+```{r manhattan-plot}
+causal <- panel_sparse$truth$causal
+plot(ss, type = "manhattan", scheme = "rotated", map = map, highlight = causal)
+```
+
+```{r scan-causal}
+## The three causal markers under the three schemes.
+knitr::kable(ss[ss$marker %in% causal, c("marker", "scheme", "beta", "se", "neglog10p", "significant")],
+             digits = 3, row.names = FALSE)
+```
+
+The marker with the largest effect is found by every scheme and the two others by none; one dataset cannot show the difference in power, which the paper's simulations measure. What it shows is the standard error: at the first causal marker the standard errors of the scan under the two approximate schemes exceed the rotation's by close to the factors that `efficiency()` predicted for it. The scan's standard errors carry a residual scale estimated at each marker, so the agreement is close, not exact, and varies from marker to marker.
+
+```{r efficiency-causal}
+knitr::kable(es[es$marker == causal[1], ], digits = 3, row.names = FALSE)
+```
+
+### The residual variance of the rotated model
+
+After the rotation the estimation errors of the means have unit variance, so the residual variance of the rotated model without a marker is one when the relationship matrix accounts for all genetic covariance among the accessions. `specification_test()` tests it against one by the increase in the REML deviance when it is fixed at one: one-sided against 2.71, the test the paper recommends, because a genetic structure missing from the model raises the residual variance; and two-sided against 3.84. Both tests can be read from the profile-likelihood intervals, which the plot shows on the profile of the deviance.
+
+```{r specification}
+std <- specification_test(rd)
+sts <- specification_test(rs)
+rm <- rotation(panel_misspecified$means, panel_misspecified$Omega, A, Q)
+stm <- specification_test(rm)
+sts
+stm
+```
+
+```{r specification-plot, fig.dim = c(7.5, 3.9)}
+op <- par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
+plot(std, main = "dense panel")
+plot(stm, main = "misspecified panel")
+par(op)
+```
+
+Neither the dense nor the sparse panel rejects: their data were simulated with the covariance of the relationship matrix. The misspecified panel rejects, since its data carry a genetic effect independent across lines with a variance of 6 against the genetic variance of 10 in the relationship matrix. The rejection says that genetic covariance is missing from the model, if the first stage is correctly specified: a first stage that understates the estimation error of the means also raises the residual variance. The extension the paper examines adds such an effect to the model, with the identity as its kernel before the rotation and $WW' = \Omega^{-1}$ after it. Without the rotation this effect and the residual error have the same covariance matrix and only the sum of their variances can be estimated; after it the two can be separated, weakly when $\Omega$ is close to proportional to the identity, as it is on the dense design with equal replication, which is why this panel has unequal replication.
+
+```{r independent}
+## The model with the independent effect, against the additive model.
+ie <- independent_effect(rm)
+ie
+```
+
+The deviance falls and the independent effect is clearly present. The free fit puts the residual variance on the boundary of zero, attributing all of the estimation error to the independent effect; with the residual variance fixed at its known value of one, the independent effect is estimated close to its generating value of 6. The paper adds the effect to the model when the test rejects, but does not evaluate a scan under the extended model. The package offers that scan so that the analysis can follow the model the test led to; when the residual variance is at zero that model is the unweighted analysis of the adjusted means, which the scan says.
+
+```{r scan-extended}
+sm <- genome_scan(rm, G, model = ie)
+summary(sm)
+```
+
+The components can instead be held at the fit with the residual variance fixed at its known value of one, with `fit = "residual_one"`; the residual scale is still re-estimated at each marker, as in every scan.
+
+```{r scan-extended-one}
+sm1 <- genome_scan(rm, G, model = ie, fit = "residual_one")
+summary(sm1)
+```
+
+### Markers close to the threshold
+
+The scan holds the variance ratio at the model without a marker. With the marker in the model and the residual variance fixed at one, the rotated fit reproduces the single-stage analysis of the plot data when the variance components are known. The paper's rule is to refit the markers whose scan statistic lies within 1.5 units of $-\log_{10} p$ of the threshold, on either side; `refit_markers()` does that for the markers a scan selects, or for named markers.
+
+```{r refit}
+## The markers of the sparse panel within 1.5 units of the threshold.
+rf <- refit_markers(rs, G, scan = ss, window = 1.5)
+knitr::kable(as.data.frame(unclass(rf)), digits = 3, row.names = FALSE)
+```
+
+```{r refit-named}
+## The three causal markers in the dense panel, named.
+sd <- genome_scan(rd, G)
+rfd <- refit_markers(rd, G, which = panel_dense$truth$causal, scan = sd)
+knitr::kable(as.data.frame(unclass(rfd)), digits = 3, row.names = FALSE)
+```
+
+The refit moves each statistic by at most a few tenths in $-\log_{10} p$, and the decisions stand.
+
+## Further notes
+
+- Multi-locus models: several markers fitted together are further columns of the design matrix and are rotated in the same way. The rotated pieces are in the `rotation` object (`y`, `X`, `K`, `W`), so any mixed-model fit of the rotated data with the residual variance fixed at one is the rotated analysis of that model.
+- Missing marker calls must be imputed before the analysis; after the rotation a cell of the marker matrix is no longer one accession's call.
+- The relationship matrix may be singular, for example a centred VanRaden matrix; the engine works in the error-contrast form and needs no ones matrix added.
+- Size: the efficiency of 59,206 markers at 159 accessions takes a few seconds, the scan under one scheme about as long; the refit is a REML fit per marker, and the independent effect is a fit with three variance components.
+
+## References
+
+Habib, Y., and H.-P. Piepho, 2026 Exact weighting in two-stage genome-wide association analysis: when does it matter? Manuscript.
+
+Piepho, H.-P., J. Möhring, T. Schulz-Streeck and J. O. Ogutu, 2012 A stage-wise approach for the analysis of multi-environment trials. Biometrical Journal 54: 844-860.
+
+VanRaden, P. M., 2008 Efficient methods to compute genomic predictions. Journal of Dairy Science 91: 4414-4423.

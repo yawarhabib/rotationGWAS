@@ -1,0 +1,30 @@
+Package: rotationGWAS
+Type: Package
+Title: Rotation for Two-Stage Genome-Wide Association Analysis
+Version: 0.9.0
+Authors@R: c(
+    person("Yawar", "Habib", email = "habib.yawr.10@gmail.com", role = c("aut", "cre")),
+    person("Hans-Peter", "Piepho", role = "aut"))
+Description: Second-stage genome-wide association analysis of adjusted means from
+    an unbalanced field trial, with the full variance-covariance matrix of the
+    means carried forward by the rotation of Piepho et al. (2012). Given the
+    adjusted means, their variance-covariance matrix, a relationship matrix,
+    covariates and marker dosages, the package reports the marker-specific
+    efficiency of inverse-variance and unweighted analysis before the genome
+    scan, rotates every input with the same matrix, runs the P3D genome scan,
+    tests the residual variance of the rotated model against one, and refits
+    chosen markers with the residual variance fixed at one, and extends the
+    model by an effect independent across accessions when the test finds the
+    residual variance above one. The package starts after the first-stage
+    analysis of the field trial; the vignette shows that first stage on the
+    synthetic rolling-panel trials shipped with the package.
+License: GPL (>= 3)
+Encoding: UTF-8
+Depends: R (>= 4.1)
+Imports: stats, utils
+Suggests: testthat (>= 3.0.0), rrBLUP, knitr, rmarkdown, lme4, emmeans, pbkrtest
+VignetteBuilder: knitr
+LazyData: true
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2

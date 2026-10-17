@@ -136,7 +136,8 @@ plot.genome_scan <- function(x, type = c("manhattan", "qq"), map = NULL, scheme 
     graphics::abline(0, 1, lty = 2)
     for (s in scheme) graphics::points(out[[s]]$expected, out[[s]]$observed, pch = 16, cex = 0.6, col = cols[[s]])
     infl <- fits$inflation[match(scheme, fits$scheme)]
-    graphics::legend("topleft", legend = sprintf("%s (inflation %.3f)", vapply(scheme, scheme_label, ""), infl), col = cols[scheme], pch = 16, bty = "n", cex = 0.85)
+    leg <- lapply(seq_along(scheme), function(i) bquote(.(scheme_label(scheme[i])) ~ (lambda == .(sprintf("%.3f", infl[i])))))
+    graphics::legend("topleft", legend = as.expression(leg), col = cols[scheme], pch = 16, bty = "n", cex = 0.85)
     invisible(if (length(out) == 1) out[[1]] else out)
   }
 }

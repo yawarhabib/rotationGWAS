@@ -250,7 +250,7 @@ The refit moves each statistic by at most a few tenths in $-\log_{10} p$, and th
 
 ## References
 
-Habib, Y., and H.-P. Piepho, 2026 Exact weighting in two-stage genome-wide association analysis: when does it matter? Manuscript.
+Habib, Y., T. Aseeva, and H.-P. Piepho, 2026 Exact weighting in two-stage genome-wide association analysis: when does it matter? Manuscript.
 
 Piepho, H.-P., J. Möhring, T. Schulz-Streeck and J. O. Ogutu, 2012 A stage-wise approach for the analysis of multi-environment trials. Biometrical Journal 54: 844-860.
 

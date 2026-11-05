@@ -1,6 +1,6 @@
 # rotationGWAS 0.9.0
 
-First release, accompanying the manuscript "Exact weighting in two-stage genome-wide association analysis: when does it matter?" (Habib and Piepho, 2026).
+First release, accompanying the manuscript "Exact weighting in two-stage genome-wide association analysis: when does it matter?" (Habib et al., 2026).
 
 - `rotation()`: the inputs aligned by accession name, the rotation matrix as the symmetric inverse square root of the variance-covariance matrix of the adjusted means, the means, the intercept, the covariates and the relationship matrix rotated with it, and the rotated model without a marker fitted with the residual variance estimated and fixed at one. A diagonal matrix (standard errors only) is accepted and labelled inverse-variance weighting.
 - `efficiency()` and `estimation_share()`: the standard error of every marker's effect under inverse-variance weighting and under the unweighted analysis relative to the rotation, and the share of the variance of the means that is estimation error, both before any scan.

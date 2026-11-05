@@ -3,11 +3,11 @@ citHeader("To cite rotationGWAS in publications, please cite the paper and the p
 bibentry(
   bibtype = "Article",
   title   = "Exact weighting in two-stage genome-wide association analysis: when does it matter?",
-  author  = c(person("Yawar", "Habib"), person("Hans-Peter", "Piepho")),
+  author  = c(person("Yawar", "Habib"), person("Tatiana", "Aseeva"), person("Hans-Peter", "Piepho")),
   journal = "Manuscript",
   year    = "2026",
   note    = "manuscript",
-  textVersion = paste("Habib, Y., and H.-P. Piepho, 2026 Exact weighting in two-stage genome-wide association analysis:",
+  textVersion = paste("Habib, Y., T. Aseeva, and H.-P. Piepho, 2026 Exact weighting in two-stage genome-wide association analysis:",
                       "when does it matter? Manuscript.")
 )
 
